@@ -5,7 +5,8 @@ use web_sys::{ImageData, CanvasRenderingContext2d};
 
 #[wasm_bindgen(start)]
 pub fn start() {
-    let document = web_sys::window().unwrap().document().unwrap();
+    let window = web_sys::window().unwrap();
+    let document = window.document().unwrap();
     let canvas = document.get_element_by_id("game").unwrap();
     let canvas: web_sys::HtmlCanvasElement = canvas
         .dyn_into::<web_sys::HtmlCanvasElement>()
@@ -19,6 +20,7 @@ pub fn start() {
         .unwrap()
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
+    context.set_font("bold 48px serif");
 
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
@@ -26,20 +28,28 @@ pub fn start() {
     let block_width = 32;
     let mut block = Block::new(block_width, block_width).unwrap();
     let max_offset = (width - block_width).min(height - block_width);
-    *g.borrow_mut() = Some(Closure::new(move || {
-        if block.position().x() > max_offset {
+    let mut last_ts = window.performance().unwrap().now();
+
+    let closure: Closure<dyn FnMut(f64)> = Closure::new(move |ts: f64| {
+        if block.position().x() > max_offset.into() {
             let _ = f.borrow_mut().take();
             return;
         }
-        block.animate(&context);
+        // Paint fresh each time
+        context.clear_rect(0.0, 0.0, width.into(), height.into());
+
+        let ts_offset = ts - last_ts;
+        last_ts = ts;
+        block.animate(&context, ts_offset);
 
         request_animation_frame(f.borrow().as_ref().unwrap());
-    }));
+    });
+    *g.borrow_mut() = Some(closure);
 
     request_animation_frame(g.borrow().as_ref().unwrap());
 }
 
-fn request_animation_frame(f: &Closure<dyn FnMut()>) {
+fn request_animation_frame(f: &Closure<dyn FnMut(f64)>) {
     let window = web_sys::window().expect("no global `window` exists");
     window
         .request_animation_frame(f.as_ref().unchecked_ref())
@@ -48,51 +58,40 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
 
 #[derive(Clone, Copy)]
 struct Coordinates {
-    x: u32,
-    y: u32,
+    x: f64,
+    y: f64,
 }
 
 trait XY: Clone {
     fn get_coordinates(&self) -> Coordinates;
     fn get_coordinates_mut(&mut self) -> &mut Coordinates;
-    fn x(&self) -> u32 {
+    fn x(&self) -> f64 {
         self.get_coordinates().x
     }
 
-    fn y(&self) -> u32 {
+    fn y(&self) -> f64 {
         self.get_coordinates().y
     }
 
-    fn set_x(&mut self, x: u32) {
+    fn set_x(&mut self, x: f64) {
         self.get_coordinates_mut().x = x;
     }
 
-    fn set_y(&mut self, y: u32) {
+    fn set_y(&mut self, y: f64) {
         self.get_coordinates_mut().y = y;
     }
 
-    fn set(&mut self, x: u32, y: u32) {
+    fn set(&mut self, x: f64, y: f64) {
         self.set_x(x);
         self.set_y(y);
     }
 
-    fn offset(&mut self, offset_x: i32, offset_y: i32) -> Self {
+    fn offset(&mut self, offset_x: f64, offset_y: f64) -> Self {
         let previous = self.clone();
-        let new_x = saturating_offset(self.x(), offset_x);
-        let new_y = saturating_offset(self.y(), offset_y);
 
-        self.set_x(new_x);
-        self.set_y(new_y);
+        self.set_x(self.x() + offset_x);
+        self.set_y(self.y() + offset_y);
         previous
-    }
-}
-
-fn saturating_offset(n: u32, offset: i32) -> u32 {
-    let abs_offset = offset.abs_diff(0);
-    if offset.is_positive() {
-        n + abs_offset
-    } else {
-        n.saturating_sub(abs_offset)
     }
 }
 
@@ -111,7 +110,7 @@ impl XY for Position {
 
 impl Default for Position {
     fn default() -> Self {
-        Self(Coordinates { x: 0, y: 0 })
+        Self(Coordinates { x: 0.0, y: 0.0 })
     }
 }
 
@@ -131,12 +130,13 @@ impl XY for Size {
 trait Animate {
     fn position(&self) -> Position;
     fn size(&self) -> Size;
-    fn animate(&mut self, context: &CanvasRenderingContext2d);
+    fn animate(&mut self, context: &CanvasRenderingContext2d, ts_offset: f64);
 }
 
 struct Block {
     size: Size,
     position: Position,
+    rate: f64,
     data: Vec<u8>,
 }
 
@@ -154,9 +154,10 @@ impl Block {
 
         Ok(Self {
             size: Size(
-                Coordinates {x: width, y: height}
+                Coordinates {x: width.into(), y: height.into()}
             ),
             position: Default::default(),
+            rate: 0.041,
             data,
         })
     }
@@ -171,20 +172,20 @@ impl Animate for Block {
         self.size
     }
 
-    fn animate(&mut self, context: &CanvasRenderingContext2d) {
-        let previous = self.position.offset(1, 1);
+    fn animate(&mut self, context: &CanvasRenderingContext2d, offset_ts: f64) {
+        let offset_x = offset_ts * self.rate;
+        let offset_y = offset_ts * self.rate;
+        let previous = self.position.offset(offset_x, offset_y);
 
-        let x = self.position.x().into();
-        let y = self.position.y().into();
+        let x = self.position.x();
+        let y = self.position.y();
         let width = self.size.x();
         let height = self.size.y();
 
-        context.clear_rect(previous.x().into(), previous.y().into(), width.into(), height.into());
-
         let image = ImageData::new_with_u8_clamped_array_and_sh(
             Clamped(&self.data),
-            width,
-            height,
+            width as u32,
+            height as u32,
         ).expect("ImageData");
 
         context.put_image_data(&image, x, y)
