@@ -1,24 +1,10 @@
 mod icons;
 
-use web_sys::{
-    CanvasRenderingContext2d,
-    ImageData,
-};
 use wasm_bindgen::{Clamped, JsValue};
+use web_sys::{CanvasRenderingContext2d, ImageData};
 
-use crate::graphics::{
-    Draw,
-    TimeStamp,
-};
-use crate::geom::{
-    Coordinates,
-    Distance,
-    OffsetStrategy,
-    Position,
-    Rect,
-    Size,
-    XY,
-};
+use crate::geom::{Coordinates, Distance, OffsetStrategy, Position, Rect, Size, XY};
+use crate::graphics::{Draw, TimeStamp};
 
 pub(crate) struct Entity {
     pub(crate) size: Size,
@@ -63,9 +49,11 @@ impl Draw for Entity {
             Clamped(&self.data),
             width as u32,
             height as u32,
-        ).expect("ImageData");
+        )
+        .expect("ImageData");
 
-        context.put_image_data(&image, x, y)
+        context
+            .put_image_data(&image, x, y)
             .expect("put_image_data");
     }
 }
@@ -85,10 +73,18 @@ pub(crate) struct Ship {
 }
 
 impl Ship {
-    pub(crate) fn new(rate: f64, y_position: Distance, left_bound: Distance, right_bound: Distance) -> Self {
+    pub(crate) fn new(
+        rate: f64,
+        y_position: Distance,
+        left_bound: Distance,
+        right_bound: Distance,
+    ) -> Self {
         let mut inner = Entity::new(icons::SHIP_WIDTH, icons::SHIP_HEIGHT, icons::SHIP).unwrap();
         let position = inner.position_mut();
-        position.set_offset_x(OffsetStrategy::limit(left_bound, right_bound - Distance::from(icons::SHIP_WIDTH)));
+        position.set_offset_x(OffsetStrategy::limit(
+            left_bound,
+            right_bound - Distance::from(icons::SHIP_WIDTH),
+        ));
         let center = left_bound
             + ((right_bound - left_bound) / 2.0)
             + (Distance::from(icons::SHIP_WIDTH) / 2.0);
@@ -108,7 +104,7 @@ impl Ship {
         match self.direction {
             Direction::Left => self.inner.position_mut().offset(-offset, 0.0),
             Direction::Right => self.inner.position_mut().offset(offset, 0.0),
-            Direction::Stopped => {},
+            Direction::Stopped => {}
         }
         self.inner.draw(context);
     }
@@ -123,16 +119,31 @@ pub(crate) struct Fleet {
 }
 
 impl Fleet {
-    pub(crate) fn new(rows: u32, columns: u32, spacing: Distance, left_bound: Distance, right_bound: Distance) -> Self {
+    pub(crate) fn new(
+        rows: u32,
+        columns: u32,
+        spacing: Distance,
+        left_bound: Distance,
+        right_bound: Distance,
+    ) -> Self {
         let mut images = icons::ENEMIES.into_iter().cycle();
         let mut members = Vec::new();
         for row_idx in 0..rows {
             let mut row = Vec::new();
             for col_idx in 0..columns {
-                let mut member = Entity::new(icons::ENEMY_WIDTH, icons::ENEMY_HEIGHT, images.next().unwrap()).expect("Block"); // TODO: dynamic size
-                member.position.set_x(Distance::from(col_idx) * (member.size().x() + spacing));
-                member.position.set_y(Distance::from(row_idx) * (member.size().y() + spacing));
-                row.push(member); 
+                let mut member = Entity::new(
+                    icons::ENEMY_WIDTH,
+                    icons::ENEMY_HEIGHT,
+                    images.next().unwrap(),
+                )
+                .expect("Block"); // TODO: dynamic size
+                member
+                    .position
+                    .set_x(Distance::from(col_idx) * (member.size().x() + spacing));
+                member
+                    .position
+                    .set_y(Distance::from(row_idx) * (member.size().y() + spacing));
+                row.push(member);
             }
             members.push(row);
         }
@@ -172,7 +183,8 @@ impl XY for Fleet {
         for row in self.members.iter_mut() {
             for (col_idx, member) in row.iter_mut().enumerate() {
                 let member_width = member.size().x();
-                (member as &mut dyn Rect).set_x(((col_idx as Distance) * (member_width + self.spacing)) + x);
+                (member as &mut dyn Rect)
+                    .set_x(((col_idx as Distance) * (member_width + self.spacing)) + x);
             }
         }
         self.position.set_x(x);
@@ -182,7 +194,8 @@ impl XY for Fleet {
         for (row_idx, row) in self.members.iter_mut().enumerate() {
             for member in row.iter_mut() {
                 let member_height = member.size().y();
-                (member as &mut dyn Rect).set_y(((row_idx as Distance) * (member_height + self.spacing)) + y);
+                (member as &mut dyn Rect)
+                    .set_y(((row_idx as Distance) * (member_height + self.spacing)) + y);
             }
         }
         self.position.set_y(y);

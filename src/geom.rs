@@ -72,7 +72,11 @@ pub struct Position(Coordinates);
 
 impl Position {
     pub fn new(x: Distance, y: Distance) -> Self {
-        Self(Coordinates{x, y, ..Default::default()})
+        Self(Coordinates {
+            x,
+            y,
+            ..Default::default()
+        })
     }
 }
 
@@ -91,7 +95,11 @@ pub struct Size(Coordinates);
 
 impl Size {
     pub fn new(x: Distance, y: Distance) -> Self {
-        Self(Coordinates{x, y, ..Default::default()})
+        Self(Coordinates {
+            x,
+            y,
+            ..Default::default()
+        })
     }
 }
 
@@ -112,10 +120,7 @@ pub trait Rect {
     fn extent(&self) -> Position {
         let origin = self.position();
         let size = self.size();
-        Position::new(
-            origin.x() + size.x(),
-            origin.y() + size.y(),
-        )
+        Position::new(origin.x() + size.x(), origin.y() + size.y())
     }
 }
 
@@ -160,18 +165,22 @@ impl OffsetStrategy {
     }
 
     pub fn cycle(min: Distance, max: Distance) -> Self {
-        Self::Cycle { min, max, direction: 1.0 }
+        Self::Cycle {
+            min,
+            max,
+            direction: 1.0,
+        }
     }
-    
+
     pub fn offset(&mut self, current: Distance, offset: Distance) -> Distance {
         match self {
             OffsetStrategy::Linear => (current + offset),
-            OffsetStrategy::Limit { min, max } => {
-                (current + offset)
-                    .min(*max)
-                    .max(*min)
-            },
-            OffsetStrategy::Cycle { min, max, direction } => {
+            OffsetStrategy::Limit { min, max } => (current + offset).min(*max).max(*min),
+            OffsetStrategy::Cycle {
+                min,
+                max,
+                direction,
+            } => {
                 let mut result = current + offset.copysign(*direction);
                 loop {
                     if result > *max {
@@ -186,7 +195,7 @@ impl OffsetStrategy {
                         break result;
                     }
                 }
-            },
+            }
         }
     }
 }

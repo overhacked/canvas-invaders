@@ -1,14 +1,14 @@
-mod graphics;
 mod entities;
 mod geom;
+mod graphics;
 
-use std::{rc::Rc, cell::RefCell, sync::mpsc};
+use std::{cell::RefCell, rc::Rc, sync::mpsc};
 
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::console;
 
-use crate::graphics::TimeStamp;
 use crate::geom::Distance;
+use crate::graphics::TimeStamp;
 
 const MARGIN_X: Distance = 30.0;
 const MARGIN_Y: Distance = 48.0;
@@ -23,12 +23,20 @@ pub fn start() {
         let send_result = key_sender.try_send(event);
 
         // Log failures to console for troubleshooting, with cause of failure
-        if let Err(ref err @ (mpsc::TrySendError::Full(ref evt)|mpsc::TrySendError::Disconnected(ref evt))) = send_result {
+        if let Err(
+            ref
+            err @ (mpsc::TrySendError::Full(ref evt) | mpsc::TrySendError::Disconnected(ref evt)),
+        ) = send_result
+        {
             console::log_1(&format!("Failed to send key event, {}: {}", err, evt.key()).into());
         }
     });
-    window.add_event_listener_with_callback("keydown", key_event_closure.as_ref().unchecked_ref()).unwrap();
-    window.add_event_listener_with_callback("keyup", key_event_closure.as_ref().unchecked_ref()).unwrap();
+    window
+        .add_event_listener_with_callback("keydown", key_event_closure.as_ref().unchecked_ref())
+        .unwrap();
+    window
+        .add_event_listener_with_callback("keyup", key_event_closure.as_ref().unchecked_ref())
+        .unwrap();
     // Must std::mem::forget() the closure so JavaScript holds onto the memory for the lifetime of
     // the program
     key_event_closure.forget();
@@ -57,28 +65,43 @@ pub fn start() {
 
     // Initialze game "globals" that the closure will take ownership over
     let mut enemies = entities::Fleet::new(4, 6, MARGIN_Y, MARGIN_X, canvas_width - MARGIN_X);
-    let mut ship = entities::Ship::new(0.5, canvas_height - MARGIN_Y, MARGIN_X, canvas_width - MARGIN_X);
+    let mut ship = entities::Ship::new(
+        0.5,
+        canvas_height - MARGIN_Y,
+        MARGIN_X,
+        canvas_width - MARGIN_X,
+    );
     let mut last_ts = window.performance().unwrap().now();
 
     let closure_inner: Closure<dyn FnMut(TimeStamp)> = Closure::new(move |ts: TimeStamp| {
         match key_receiver.try_recv() {
             Ok(evt) => {
                 let evt_type = evt.type_();
-                console::log_1(&format!("Key event: {} {} ({})", evt_type, evt.key(), evt.key_code()).into());
+                console::log_1(
+                    &format!("Key event: {} {} ({})", evt_type, evt.key(), evt.key_code()).into(),
+                );
                 match evt.key().as_str() {
-                    "a"|"ArrowLeft" => {
-                        ship.direction = if evt_type == "keydown" { entities::Direction::Left } else { entities::Direction::Stopped };
-                    },
-                    "d"|"ArrowRight" => {
-                        ship.direction = if evt_type == "keydown" { entities::Direction::Right } else { entities::Direction::Stopped };
-                    },
-                    _ => {}, // Ignore
+                    "a" | "ArrowLeft" => {
+                        ship.direction = if evt_type == "keydown" {
+                            entities::Direction::Left
+                        } else {
+                            entities::Direction::Stopped
+                        };
+                    }
+                    "d" | "ArrowRight" => {
+                        ship.direction = if evt_type == "keydown" {
+                            entities::Direction::Right
+                        } else {
+                            entities::Direction::Stopped
+                        };
+                    }
+                    _ => {} // Ignore
                 }
-            },
-            Err(mpsc::TryRecvError::Empty) => {}, // OK, no keys pressed
+            }
+            Err(mpsc::TryRecvError::Empty) => {} // OK, no keys pressed
             Err(err) => {
                 console::log_1(&format!("Failed to receive key event, {}", err).into());
-            },
+            }
         }
         context.clear_rect(0.0, 0.0, canvas_width, canvas_height);
 
