@@ -1,3 +1,5 @@
+mod icons;
+
 use web_sys::{
     CanvasRenderingContext2d,
     ImageData,
@@ -25,16 +27,8 @@ pub(crate) struct Entity {
 }
 
 impl Entity {
-    pub(crate) fn new(width: u32, height: u32) -> Result<Self, JsValue> {
-        let mut data = Vec::new();
-        for _x in 0..width {
-            for _y in 0..height {
-                data.push(255u8); // R
-                data.push(0u8); // G
-                data.push(0u8); // B
-                data.push(255u8); // a
-            }
-        }
+    pub(crate) fn new(width: u32, height: u32, image: impl AsRef<[u8]>) -> Result<Self, JsValue> {
+        let mut data = image.as_ref().to_vec();
 
         Ok(Self {
             size: Size::new(width.into(), height.into()),
@@ -91,19 +85,16 @@ pub(crate) struct Ship {
 }
 
 impl Ship {
-    pub(crate) const SHIP_WIDTH: u32 = 16;
-    pub(crate) const SHIP_HEIGHT: u32 = 16;
-
     pub(crate) fn new(rate: f64, y_position: Distance, left_bound: Distance, right_bound: Distance) -> Self {
-        let mut inner = Entity::new(Self::SHIP_WIDTH, Self::SHIP_HEIGHT).unwrap();
+        let mut inner = Entity::new(icons::SHIP_WIDTH, icons::SHIP_HEIGHT, icons::SHIP).unwrap();
         let position = inner.position_mut();
-        position.set_offset_x(OffsetStrategy::limit(left_bound, right_bound - Distance::from(Self::SHIP_WIDTH)));
+        position.set_offset_x(OffsetStrategy::limit(left_bound, right_bound - Distance::from(icons::SHIP_WIDTH)));
         let center = left_bound
             + ((right_bound - left_bound) / 2.0)
-            + (Distance::from(Self::SHIP_WIDTH) / 2.0);
+            + (Distance::from(icons::SHIP_WIDTH) / 2.0);
         position.set_x(center);
         position.set_offset_y(OffsetStrategy::limit(y_position, y_position));
-        position.set_y(y_position);
+        position.set_y(y_position - Distance::from(icons::SHIP_HEIGHT));
 
         Self {
             inner,
@@ -132,15 +123,13 @@ pub(crate) struct Fleet {
 }
 
 impl Fleet {
-    pub(crate) const MEMBER_WIDTH: u32 = 32;
-    pub(crate) const MEMBER_HEIGHT: u32 = 32;
-
     pub(crate) fn new(rows: u32, columns: u32, spacing: Distance, left_bound: Distance, right_bound: Distance) -> Self {
+        let mut images = icons::ENEMIES.into_iter().cycle();
         let mut members = Vec::new();
         for row_idx in 0..rows {
             let mut row = Vec::new();
             for col_idx in 0..columns {
-                let mut member = Entity::new(Self::MEMBER_WIDTH, Self::MEMBER_HEIGHT).expect("Block"); // TODO: dynamic size
+                let mut member = Entity::new(icons::ENEMY_WIDTH, icons::ENEMY_HEIGHT, images.next().unwrap()).expect("Block"); // TODO: dynamic size
                 member.position.set_x(Distance::from(col_idx) * (member.size().x() + spacing));
                 member.position.set_y(Distance::from(row_idx) * (member.size().y() + spacing));
                 row.push(member); 
@@ -149,8 +138,8 @@ impl Fleet {
         }
 
         let size = Size::new(
-            (Distance::from(columns) * (Distance::from(Self::MEMBER_WIDTH) + spacing)) - spacing,
-            (Distance::from(rows) * (Distance::from(Self::MEMBER_HEIGHT) + spacing)) - spacing,
+            (Distance::from(columns) * (Distance::from(icons::ENEMY_WIDTH) + spacing)) - spacing,
+            (Distance::from(rows) * (Distance::from(icons::ENEMY_HEIGHT) + spacing)) - spacing,
         );
         let mut position = Position::new(left_bound, 60.0); // TODO: 60.0 to variable
         position.set_offset_x(OffsetStrategy::cycle(left_bound, right_bound - size.x()));

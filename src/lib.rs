@@ -11,7 +11,7 @@ use crate::graphics::TimeStamp;
 use crate::geom::Distance;
 
 const MARGIN_X: Distance = 30.0;
-const MARGIN_Y: Distance = 30.0;
+const MARGIN_Y: Distance = 48.0;
 
 #[wasm_bindgen(start)]
 pub fn start() {
@@ -39,8 +39,8 @@ pub fn start() {
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .map_err(|_| ())
         .unwrap();
-    let width = Distance::from(canvas.width());
-    let height = Distance::from(canvas.height());
+    let canvas_width = Distance::from(canvas.width());
+    let canvas_height = Distance::from(canvas.height());
 
     let context = canvas
         .get_context("2d")
@@ -56,8 +56,8 @@ pub fn start() {
     let animation_closure_initial = animation_closure.clone();
 
     // Initialze game "globals" that the closure will take ownership over
-    let mut enemies = entities::Fleet::new(4, 6, MARGIN_Y, MARGIN_X, width - MARGIN_X);
-    let mut ship = entities::Ship::new(0.5, height - MARGIN_Y, MARGIN_X, width - MARGIN_X);
+    let mut enemies = entities::Fleet::new(4, 6, MARGIN_Y, MARGIN_X, canvas_width - MARGIN_X);
+    let mut ship = entities::Ship::new(0.5, canvas_height - MARGIN_Y, MARGIN_X, canvas_width - MARGIN_X);
     let mut last_ts = window.performance().unwrap().now();
 
     let closure_inner: Closure<dyn FnMut(TimeStamp)> = Closure::new(move |ts: TimeStamp| {
@@ -80,7 +80,7 @@ pub fn start() {
                 console::log_1(&format!("Failed to receive key event, {}", err).into());
             },
         }
-        context.clear_rect(0.0, 0.0, width, height);
+        context.clear_rect(0.0, 0.0, canvas_width, canvas_height);
 
         let ts_offset = ts - last_ts;
         last_ts = ts;
