@@ -94,7 +94,12 @@ pub fn start() {
                         } else {
                             entities::Direction::Stopped
                         };
-                    }
+                    },
+                    "w" | "ArrowUp" => {
+                        if evt_type == "keydown" {
+                            ship.shoot();
+                        }
+                    },
                     _ => {} // Ignore
                 }
             }

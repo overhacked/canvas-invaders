@@ -14,7 +14,7 @@ pub(crate) struct Entity {
 
 impl Entity {
     pub(crate) fn new(width: u32, height: u32, image: impl AsRef<[u8]>) -> Result<Self, JsValue> {
-        let mut data = image.as_ref().to_vec();
+        let data = image.as_ref().to_vec();
 
         Ok(Self {
             size: Size::new(width.into(), height.into()),
@@ -70,6 +70,7 @@ pub(crate) struct Ship {
     pub(crate) inner: Entity,
     pub(crate) direction: Direction,
     pub(crate) rate: f64,
+    bullets: Vec<Bullet>,
 }
 
 impl Ship {
@@ -96,6 +97,7 @@ impl Ship {
             inner,
             direction: Default::default(),
             rate,
+            bullets: Vec::new(),
         }
     }
 
@@ -107,6 +109,27 @@ impl Ship {
             Direction::Stopped => {}
         }
         self.inner.draw(context);
+        // Way better to use nightly's drain_filter here. Alas.
+        let mut i = 0;
+        while i < self.bullets.len() {
+            if self.bullets[i].inner.position().y() < -(f64::from(icons::BULLET_HEIGHT)) {
+                // swap_remove more performant here, becuase
+                // bullet iteration order doesn't matter
+                self.bullets.swap_remove(i);
+            } else {
+                self.bullets[i].animate(context, offset_ts);
+                i += 1;
+            }
+        }
+    }
+
+    pub(crate) fn shoot(&mut self) {
+        let position = Position::new(
+            self.inner.position().x() + 11.0,
+            self.inner.position().y() + 10.0,
+        );
+        let bullet = Bullet::new(position);
+        self.bullets.push(bullet);
     }
 }
 
@@ -223,5 +246,29 @@ impl Draw for Fleet {
                 member.draw(context);
             }
         }
+    }
+}
+
+pub(crate) struct Bullet {
+    pub(crate) inner: Entity,
+}
+
+impl Bullet {
+    const RATE: f64 = 0.5;
+
+    pub(crate) fn new(position: Position) -> Self {
+        let mut inner = Entity::new(icons::BULLET_WIDTH, icons::BULLET_HEIGHT, icons::BULLET).unwrap();
+        *inner.position_mut() = position;
+
+        Self {
+            inner,
+        }
+    }
+
+    pub(crate) fn animate(&mut self, context: &CanvasRenderingContext2d, offset_ts: TimeStamp) {
+        let pos = self.inner.position_mut();
+        let y = pos.y();
+        pos.set_y(y - (Self::RATE * offset_ts));
+        self.inner.draw(context);
     }
 }
